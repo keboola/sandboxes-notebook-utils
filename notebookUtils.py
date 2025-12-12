@@ -74,23 +74,24 @@ def saveFile(file_path, sandbox_id, token, log, tags=None):
         raise e
 
 
-def updateApiTimestamp(sandbox_id, token, log):
+def updateApiTimestamp(sandbox_id, log):
     """
     Update autosave timestamp in Sandboxes API
     Args:
         sandbox_id: Id of the sandbox
-        token: Keboola Storage token
         log: Logger instance
     """
 
     headers = {
         'Content-Type': 'application/json',
         'User-Agent': 'Keboola Sandbox Autosave Request',
-        'X-StorageApi-Token': token,
     }
-    url = os.environ['SANDBOXES_API_URL'] + '/sandboxes/' + sandbox_id
-    body = json.dumps({'lastAutosaveTimestamp': datetime.now().strftime('%Y-%m-%dT%H:%M:%S.%f')})
-    result = retrySession().patch(url, data=body, headers=headers)
+    if 'DATA_LOADER_API_URL' in os.environ and os.environ['DATA_LOADER_API_URL']:
+        url = 'http://' + os.environ['DATA_LOADER_API_URL'] + '/data-loader-api/internal/activity'
+    else:
+        url = 'http://data-loader-api/data-loader-api/internal/activity'
+
+    result = retrySession().post(url, headers=headers)
     if result.status_code == requests.codes.ok:
         log.info('Successfully saved autosave to Sandboxes API')
     else:
@@ -143,25 +144,34 @@ def saveFolder(folder_path, sandbox_id, token, log):
                 os.remove(gz_path)
 
 
+def _get_internal_autosave_url():
+    """Get the URL for the internal autosave endpoint."""
+    base = os.environ.get('DATA_LOADER_API_URL', 'data-loader-api')
+    return f'http://{base}/data-loader-api/internal/autosave'
+
+
 def scriptPostSave(model, os_path, contents_manager, **kwargs):
     """
-    Hook on notebook save
-    - Saves the notebook file to Keboola Storage
-    - Saves .git folder to Keboola Storage if initialized
-    - Updates lastAutosaveTimestamp in the API record
+    Hook on notebook save - delegates to data-loader-api internal endpoint.
     """
     if model['type'] != 'notebook':
         return
+
     log = contents_manager.log
+    log.info(f'Notebook saved: {os_path}, triggering autosave')
 
-    sandbox_id = os.environ['SANDBOX_ID']
-    token = getStorageTokenFromEnv(log)
-    updateApiTimestamp(sandbox_id, token, log)
-
-    has_persistent_storage = os.getenv('HAS_PERSISTENT_STORAGE', 'False').lower() in ('true', '1')
-    if not has_persistent_storage:
-        saveFile(os_path, sandbox_id, token, log)
-        saveFolder('/data/.git', sandbox_id, token, log)
+    url = _get_internal_autosave_url()
+    try:
+        response = retrySession().post(
+            url,
+            json={'file_path': os_path},
+            headers={'Content-Type': 'application/json'},
+            timeout=300,  # 5 min for large notebooks + git
+        )
+        response.raise_for_status()
+        log.info('Autosave completed successfully')
+    except Exception as e:
+        log.exception(f'Autosave failed: {e}')
 
 
 def notebookSetup(c):
