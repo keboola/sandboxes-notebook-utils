@@ -8,7 +8,7 @@ import string
 import tempfile
 
 from notebookUtils import compressFolder, getStorageTokenFromEnv, notebookSetup, saveFile, saveFolder, \
-    scriptPostSave, updateApiTimestamp
+    scriptPostSave, updateApiTimestamp, _get_internal_autosave_url
 
 def generate_random_string():
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
@@ -38,64 +38,63 @@ class TestNotebookUtils():
         assert "object has no attribute 'password'" in str(attribute_error.value)
 
     def test_scriptPostSave(self):
+        """Test that scriptPostSave calls the internal autosave endpoint."""
         with requests_mock.Mocker() as m:
-            os.environ['SANDBOX_ID'] = '123'
             os.environ['DATA_LOADER_API_URL'] = 'dataloader'
-            os.environ['KBC_TOKEN'] = 'token'
-            if 'HAS_PERSISTENT_STORAGE' in os.environ:
-                del os.environ['HAS_PERSISTENT_STORAGE']
 
-            dataLoaderMock = m.post('http://dataloader/data-loader-api/save', json={'result': 'ok'})
-            dataLoaderActivityMock = m.post('http://dataloader/data-loader-api/internal/activity', json={'result': 'ok'})
+            autosaveMock = m.post('http://dataloader/data-loader-api/internal/autosave', json={'status': 'ok'})
 
             contentsManager = type('', (), {})()
             contentsManager.log = logging
-            scriptPostSave({'type': 'notebook'}, '/path', contentsManager)
+            scriptPostSave({'type': 'notebook'}, '/data/notebook.ipynb', contentsManager)
 
-            assert dataLoaderMock.call_count == 1
-            assert 'file' in dataLoaderMock.last_request.text
-            assert 'tags' in dataLoaderMock.last_request.text
+            assert autosaveMock.call_count == 1
+            request_json = json.loads(autosaveMock.last_request.text)
+            assert request_json['file_path'] == '/data/notebook.ipynb'
 
-            assert dataLoaderActivityMock.call_count == 1
-
-    def test_scriptPostSave_disabledPersistentStorage(self):
+    def test_scriptPostSave_skipsNonNotebook(self):
+        """Test that scriptPostSave skips non-notebook files."""
         with requests_mock.Mocker() as m:
-            os.environ['SANDBOX_ID'] = '123'
             os.environ['DATA_LOADER_API_URL'] = 'dataloader'
-            os.environ['KBC_TOKEN'] = 'token'
-            os.environ['HAS_PERSISTENT_STORAGE'] = '0'
-            dataLoaderMock = m.post('http://dataloader/data-loader-api/save', json={'result': 'ok'})
-            dataLoaderActivityMock = m.post('http://dataloader/data-loader-api/internal/activity', json={'result': 'ok'})
+
+            autosaveMock = m.post('http://dataloader/data-loader-api/internal/autosave', json={'status': 'ok'})
 
             contentsManager = type('', (), {})()
             contentsManager.log = logging
-            scriptPostSave({'type': 'notebook'}, '/path', contentsManager)
+            scriptPostSave({'type': 'file'}, '/data/script.py', contentsManager)
 
-            assert dataLoaderMock.call_count == 1
-            assert 'file' in dataLoaderMock.last_request.text
-            assert 'tags' in dataLoaderMock.last_request.text
+            assert autosaveMock.call_count == 0
 
-            assert dataLoaderActivityMock.call_count == 1
-
-
-    def test_scriptPostSave_enabledPersistentStorage(self):
+    def test_scriptPostSave_handlesError(self):
+        """Test that scriptPostSave handles errors gracefully."""
         with requests_mock.Mocker() as m:
-            os.environ['SANDBOX_ID'] = '123'
             os.environ['DATA_LOADER_API_URL'] = 'dataloader'
-            os.environ['KBC_TOKEN'] = 'token'
-            os.environ['HAS_PERSISTENT_STORAGE'] = '1'
-            dataLoaderMock = m.post('http://dataloader/data-loader-api/save', json={'result': 'ok'})
-            dataLoaderActivityMock = m.post('http://dataloader/data-loader-api/internal/activity', json={'result': 'ok'})
+
+            autosaveMock = m.post('http://dataloader/data-loader-api/internal/autosave', status_code=500)
 
             contentsManager = type('', (), {})()
             contentsManager.log = logging
-            scriptPostSave({'type': 'notebook'}, '/path', contentsManager)
+            # Should not raise, just log the error
+            scriptPostSave({'type': 'notebook'}, '/data/notebook.ipynb', contentsManager)
 
-            assert dataLoaderMock.call_count == 0
-            assert dataLoaderActivityMock.call_count == 1
+            assert autosaveMock.call_count == 1
+
+    def test_get_internal_autosave_url_with_env(self):
+        """Test URL construction with DATA_LOADER_API_URL set."""
+        os.environ['DATA_LOADER_API_URL'] = 'custom-api-host'
+        url = _get_internal_autosave_url()
+        assert url == 'http://custom-api-host/data-loader-api/internal/autosave'
+
+    def test_get_internal_autosave_url_default(self):
+        """Test URL construction with default value."""
+        if 'DATA_LOADER_API_URL' in os.environ:
+            del os.environ['DATA_LOADER_API_URL']
+        url = _get_internal_autosave_url()
+        assert url == 'http://data-loader-api/data-loader-api/internal/autosave'
 
     def test_getStorageTokenFromEnvMissing(self):
-        os.environ.pop('KBC_TOKEN')
+        if 'KBC_TOKEN' in os.environ:
+            del os.environ['KBC_TOKEN']
         with pytest.raises(Exception):
             getStorageTokenFromEnv(logging)
 
@@ -106,7 +105,9 @@ class TestNotebookUtils():
 
     def test_updateApiTimestamp(self):
         with requests_mock.Mocker() as m:
-            dataLoaderActivityMock = m.post('http://dataloader/data-loader-api/internal/activity', json={'result': 'ok'})
+            os.environ['DATA_LOADER_API_URL'] = 'dataloader'
+            url = 'http://dataloader/data-loader-api/internal/activity'
+            dataLoaderActivityMock = m.post(url, json={'result': 'ok'})
 
             updateApiTimestamp('123', logging)
 
