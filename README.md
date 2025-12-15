@@ -4,6 +4,10 @@
 
 common functionality used by keboola sandbox notebooks
 
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md).
+
 ## License
 
 MIT licensed, see [LICENSE](./LICENSE) file.
