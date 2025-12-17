@@ -1,4 +1,4 @@
-from distutils.core import setup
+from setuptools import setup
 
 setup(
     name='keboola-sandboxes-notebook-utils',
@@ -6,5 +6,10 @@ setup(
     url='https://github.com/keboola/sandboxes-notebook-utils',
     packages=['keboola_notebook_utils'],
     package_dir={'keboola_notebook_utils': ''},
-    requires=['pip']
+    install_requires=['requests'],
+    entry_points={
+        'console_scripts': [
+            'autosave-worker=keboola_notebook_utils.autosave_worker:main',
+        ],
+    },
 )
