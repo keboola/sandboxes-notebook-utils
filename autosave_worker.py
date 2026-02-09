@@ -7,7 +7,6 @@ Usage:
     python -m keboola_notebook_utils.autosave_worker --file-path=/data/notebook.ipynb
 
 Required env vars:
-    - KBC_TOKEN: Storage API token
     - SANDBOX_ID: Sandbox identifier
     - DATA_LOADER_API_URL: API base URL (optional, defaults to data-loader-api)
     - HAS_PERSISTENT_STORAGE: If 'true', skip file upload
@@ -40,19 +39,14 @@ def main():
         log.error('SANDBOX_ID environment variable is required')
         sys.exit(1)
 
-    token = os.environ.get('KBC_TOKEN')
-    if not token:
-        log.error('KBC_TOKEN environment variable is required')
-        sys.exit(1)
-
     log.info(f'Starting autosave for sandbox {sandbox_id}, file: {args.file_path}')
 
     updateApiTimestamp(sandbox_id, log)
 
     has_persistent_storage = os.getenv('HAS_PERSISTENT_STORAGE', 'False').lower() in ('true', '1')
     if not has_persistent_storage:
-        saveFile(args.file_path, sandbox_id, token, log)
-        saveFolder('/data/.git', sandbox_id, token, log)
+        saveFile(args.file_path, sandbox_id, log)
+        saveFolder('/data/.git', sandbox_id, log)
 
     log.info('Autosave completed successfully')
 
