@@ -16,17 +16,7 @@ class TestAutosaveWorker:
 
     def test_missing_sandbox_id_env_var(self):
         """Test that missing SANDBOX_ID env var causes exit"""
-        env = {'KBC_TOKEN': 'test-token'}
-        with patch.dict(os.environ, env, clear=True):
-            with patch.object(sys, 'argv', ['autosave_worker', '--file-path=/data/notebook.ipynb']):
-                with pytest.raises(SystemExit) as exc_info:
-                    from autosave_worker import main
-                    main()
-                assert exc_info.value.code == 1
-
-    def test_missing_kbc_token_env_var(self):
-        """Test that missing KBC_TOKEN env var causes exit"""
-        env = {'SANDBOX_ID': 'test-sandbox'}
+        env = {}
         with patch.dict(os.environ, env, clear=True):
             with patch.object(sys, 'argv', ['autosave_worker', '--file-path=/data/notebook.ipynb']):
                 with pytest.raises(SystemExit) as exc_info:
@@ -38,7 +28,6 @@ class TestAutosaveWorker:
         """Test that HAS_PERSISTENT_STORAGE=true only calls updateApiTimestamp"""
         env = {
             'SANDBOX_ID': 'test-sandbox',
-            'KBC_TOKEN': 'test-token',
             'HAS_PERSISTENT_STORAGE': 'true',
             'DATA_LOADER_API_URL': 'dataloader',
         }
@@ -64,7 +53,6 @@ class TestAutosaveWorker:
         """Test that HAS_PERSISTENT_STORAGE=false calls all save functions"""
         env = {
             'SANDBOX_ID': 'test-sandbox',
-            'KBC_TOKEN': 'test-token',
             'HAS_PERSISTENT_STORAGE': 'false',
             'DATA_LOADER_API_URL': 'dataloader',
         }
@@ -87,18 +75,15 @@ class TestAutosaveWorker:
         mock_save_file.assert_called_once()
         assert mock_save_file.call_args[0][0] == '/data/notebook.ipynb'
         assert mock_save_file.call_args[0][1] == 'test-sandbox'
-        assert mock_save_file.call_args[0][2] == 'test-token'
 
         mock_save_folder.assert_called_once()
         assert mock_save_folder.call_args[0][0] == '/data/.git'
         assert mock_save_folder.call_args[0][1] == 'test-sandbox'
-        assert mock_save_folder.call_args[0][2] == 'test-token'
 
     def test_no_persistent_storage_env_defaults_to_false(self):
         """Test that missing HAS_PERSISTENT_STORAGE defaults to false (calls all functions)"""
         env = {
             'SANDBOX_ID': 'test-sandbox',
-            'KBC_TOKEN': 'test-token',
             'DATA_LOADER_API_URL': 'dataloader',
         }
 
