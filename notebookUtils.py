@@ -37,14 +37,13 @@ def retrySession(
     return session
 
 
-def saveFile(file_path, sandbox_id, token, log, tags=None):
+def saveFile(file_path, sandbox_id, log, tags=None):
     """
     Construct a requests POST call with args and kwargs and process the
     results.
     Args:
         file_path: The relative path to the file from the datadir, including filename and extension
         sandbox_id: Id of the sandbox
-        token: Keboola Storage token
         log: Logger instance
         tags: Additional tags for the file
     Returns:
@@ -57,10 +56,10 @@ def saveFile(file_path, sandbox_id, token, log, tags=None):
     if tags is None:
         tags = []
     if 'DATA_LOADER_API_URL' in os.environ and os.environ['DATA_LOADER_API_URL']:
-        url = 'http://' + os.environ['DATA_LOADER_API_URL'] + '/data-loader-api/save'
+        url = 'http://' + os.environ['DATA_LOADER_API_URL'] + '/data-loader-api/internal/save'
     else:
-        url = 'http://data-loader-api/data-loader-api/save'
-    headers = {'X-StorageApi-Token': token, 'User-Agent': 'Keboola Sandbox Autosave Request'}
+        url = 'http://data-loader-api/data-loader-api/internal/save'
+    headers = {'Content-Type': 'application/json', 'User-Agent': 'Keboola Sandbox Autosave Request'}
     payload = {'file': {'source': os.path.relpath(file_path), 'tags': ['autosave', 'sandbox-' + sandbox_id] + tags}}
 
     # the timeout is set to > 3min because of the delay on 400 level exception responses
@@ -98,20 +97,6 @@ def updateApiTimestamp(sandbox_id, log):
         log.error('Saving autosave to Sandboxes API errored: ' + result.text)
 
 
-def getStorageTokenFromEnv(log):
-    """
-    Find Keboola token in env vars
-    Args:
-        log: Logger instance
-    """
-
-    if 'KBC_TOKEN' in os.environ:
-        return os.environ['KBC_TOKEN']
-    else:
-        log.error('Could not find Keboola Storage API token.')
-        raise Exception('Could not find Keboola Storage API token.')
-
-
 def compressFolder(folder_path):
     """
     Gzip folder
@@ -126,19 +111,18 @@ def compressFolder(folder_path):
     return gz_path
 
 
-def saveFolder(folder_path, sandbox_id, token, log):
+def saveFolder(folder_path, sandbox_id, log):
     """
     Gzip folder and save it to Keboola Storage
     Args:
         folder_path: Path to the folder
         sandbox_id: Id of the sandbox
-        token: Keboola Storage token
         log: Logger instance
     """
     if os.path.exists(folder_path):
         gz_path = compressFolder(folder_path)
         try:
-            saveFile(gz_path, sandbox_id, token, log, ['git'])
+            saveFile(gz_path, sandbox_id, log, ['git'])
         finally:
             if os.path.exists(gz_path):
                 os.remove(gz_path)
