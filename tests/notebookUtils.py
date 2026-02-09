@@ -7,7 +7,7 @@ import requests_mock
 import string
 import tempfile
 
-from notebookUtils import compressFolder, getStorageTokenFromEnv, notebookSetup, saveFile, saveFolder, \
+from notebookUtils import compressFolder, notebookSetup, saveFile, saveFolder, \
     scriptPostSave, updateApiTimestamp, _get_internal_autosave_url
 
 def generate_random_string():
@@ -91,17 +91,6 @@ class TestNotebookUtils():
             del os.environ['DATA_LOADER_API_URL']
         url = _get_internal_autosave_url()
         assert url == 'http://data-loader-api/data-loader-api/internal/autosave'
-
-    def test_getStorageTokenFromEnvMissing(self):
-        if 'KBC_TOKEN' in os.environ:
-            del os.environ['KBC_TOKEN']
-        with pytest.raises(Exception):
-            getStorageTokenFromEnv(logging)
-
-    def test_getStorageTokenFromEnvOk(self):
-        token = generate_random_string()
-        os.environ['KBC_TOKEN'] = token
-        assert getStorageTokenFromEnv(logging) == token
 
     def test_updateApiTimestamp(self):
         with requests_mock.Mocker() as m:

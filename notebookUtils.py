@@ -98,19 +98,6 @@ def updateApiTimestamp(sandbox_id, log):
         log.error('Saving autosave to Sandboxes API errored: ' + result.text)
 
 
-def getStorageTokenFromEnv(log):
-    """
-    Find Keboola token in env vars
-    Args:
-        log: Logger instance
-    """
-
-    if 'KBC_TOKEN' in os.environ:
-        return os.environ['KBC_TOKEN']
-    else:
-        log.error('Could not find Keboola Storage API token.')
-        raise Exception('Could not find Keboola Storage API token.')
-
 
 def compressFolder(folder_path):
     """
