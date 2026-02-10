@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='keboola-sandboxes-notebook-utils',
-    version='2.2.0.dev1',
+    version='2.3.0.dev2',
     url='https://github.com/keboola/sandboxes-notebook-utils',
     packages=['keboola_notebook_utils'],
     package_dir={'keboola_notebook_utils': ''},
