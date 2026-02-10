@@ -8,7 +8,7 @@ import string
 import tempfile
 
 from notebookUtils import compressFolder, notebookSetup, saveFile, saveFolder, \
-    scriptPostSave, updateApiTimestamp, _get_internal_autosave_url
+    scriptPostSave, updateApiTimestamp, _get_internal_save_url
 
 def generate_random_string():
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
@@ -38,11 +38,11 @@ class TestNotebookUtils():
         assert "object has no attribute 'password'" in str(attribute_error.value)
 
     def test_scriptPostSave(self):
-        """Test that scriptPostSave calls the internal autosave endpoint."""
+        """Test that scriptPostSave calls the internal save endpoint."""
         with requests_mock.Mocker() as m:
             os.environ['DATA_LOADER_API_URL'] = 'dataloader'
 
-            autosaveMock = m.post('http://dataloader/data-loader-api/internal/autosave', json={'status': 'ok'})
+            autosaveMock = m.post('http://dataloader/data-loader-api/internal/save', json={'status': 'ok'})
 
             contentsManager = type('', (), {})()
             contentsManager.log = logging
@@ -57,7 +57,7 @@ class TestNotebookUtils():
         with requests_mock.Mocker() as m:
             os.environ['DATA_LOADER_API_URL'] = 'dataloader'
 
-            autosaveMock = m.post('http://dataloader/data-loader-api/internal/autosave', json={'status': 'ok'})
+            autosaveMock = m.post('http://dataloader/data-loader-api/internal/save', json={'status': 'ok'})
 
             contentsManager = type('', (), {})()
             contentsManager.log = logging
@@ -70,7 +70,7 @@ class TestNotebookUtils():
         with requests_mock.Mocker() as m:
             os.environ['DATA_LOADER_API_URL'] = 'dataloader'
 
-            autosaveMock = m.post('http://dataloader/data-loader-api/internal/autosave', status_code=500)
+            autosaveMock = m.post('http://dataloader/data-loader-api/internal/save', status_code=500)
 
             contentsManager = type('', (), {})()
             contentsManager.log = logging
@@ -79,18 +79,18 @@ class TestNotebookUtils():
 
             assert autosaveMock.call_count == 1
 
-    def test_get_internal_autosave_url_with_env(self):
+    def test_get_internal_save_url_with_env(self):
         """Test URL construction with DATA_LOADER_API_URL set."""
         os.environ['DATA_LOADER_API_URL'] = 'custom-api-host'
-        url = _get_internal_autosave_url()
-        assert url == 'http://custom-api-host/data-loader-api/internal/autosave'
+        url = _get_internal_save_url()
+        assert url == 'http://custom-api-host/data-loader-api/internal/save'
 
-    def test_get_internal_autosave_url_default(self):
+    def test_get_internal_save_url_default(self):
         """Test URL construction with default value."""
         if 'DATA_LOADER_API_URL' in os.environ:
             del os.environ['DATA_LOADER_API_URL']
-        url = _get_internal_autosave_url()
-        assert url == 'http://data-loader-api/data-loader-api/internal/autosave'
+        url = _get_internal_save_url()
+        assert url == 'http://data-loader-api/data-loader-api/internal/save'
 
     def test_updateApiTimestamp(self):
         with requests_mock.Mocker() as m:
