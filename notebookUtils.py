@@ -128,10 +128,10 @@ def saveFolder(folder_path, sandbox_id, log):
                 os.remove(gz_path)
 
 
-def _get_internal_autosave_url():
-    """Get the URL for the internal autosave endpoint."""
+def _get_internal_save_url():
+    """Get the URL for the internal save endpoint."""
     base = os.environ.get('DATA_LOADER_API_URL', 'data-loader-api')
-    return f'http://{base}/data-loader-api/internal/autosave'
+    return f'http://{base}/data-loader-api/internal/save'
 
 
 def scriptPostSave(model, os_path, contents_manager, **kwargs):
@@ -144,7 +144,7 @@ def scriptPostSave(model, os_path, contents_manager, **kwargs):
     log = contents_manager.log
     log.info(f'Notebook saved: {os_path}, triggering autosave')
 
-    url = _get_internal_autosave_url()
+    url = _get_internal_save_url()
     try:
         response = retrySession().post(
             url,
