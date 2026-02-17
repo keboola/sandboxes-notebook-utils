@@ -7,7 +7,7 @@ import requests_mock
 import string
 import tempfile
 
-from notebookUtils import compressFolder, getStorageTokenFromEnv, notebookSetup, saveFile, saveFolder, \
+from notebookUtils import compressFolder, notebookSetup, saveFile, saveFolder, \
     scriptPostSave, updateApiTimestamp
 
 def generate_random_string():
@@ -41,11 +41,10 @@ class TestNotebookUtils():
         with requests_mock.Mocker() as m:
             os.environ['SANDBOX_ID'] = '123'
             os.environ['DATA_LOADER_API_URL'] = 'dataloader'
-            os.environ['KBC_TOKEN'] = 'token'
             if 'HAS_PERSISTENT_STORAGE' in os.environ:
                 del os.environ['HAS_PERSISTENT_STORAGE']
 
-            dataLoaderMock = m.post('http://dataloader/data-loader-api/save', json={'result': 'ok'})
+            dataLoaderMock = m.post('http://dataloader/data-loader-api/internal/save', json={'result': 'ok'})
             dataLoaderActivityMock = m.post('http://dataloader/data-loader-api/internal/activity', json={'result': 'ok'})
 
             contentsManager = type('', (), {})()
@@ -62,9 +61,8 @@ class TestNotebookUtils():
         with requests_mock.Mocker() as m:
             os.environ['SANDBOX_ID'] = '123'
             os.environ['DATA_LOADER_API_URL'] = 'dataloader'
-            os.environ['KBC_TOKEN'] = 'token'
             os.environ['HAS_PERSISTENT_STORAGE'] = '0'
-            dataLoaderMock = m.post('http://dataloader/data-loader-api/save', json={'result': 'ok'})
+            dataLoaderMock = m.post('http://dataloader/data-loader-api/internal/save', json={'result': 'ok'})
             dataLoaderActivityMock = m.post('http://dataloader/data-loader-api/internal/activity', json={'result': 'ok'})
 
             contentsManager = type('', (), {})()
@@ -77,14 +75,12 @@ class TestNotebookUtils():
 
             assert dataLoaderActivityMock.call_count == 1
 
-
     def test_scriptPostSave_enabledPersistentStorage(self):
         with requests_mock.Mocker() as m:
             os.environ['SANDBOX_ID'] = '123'
             os.environ['DATA_LOADER_API_URL'] = 'dataloader'
-            os.environ['KBC_TOKEN'] = 'token'
             os.environ['HAS_PERSISTENT_STORAGE'] = '1'
-            dataLoaderMock = m.post('http://dataloader/data-loader-api/save', json={'result': 'ok'})
+            dataLoaderMock = m.post('http://dataloader/data-loader-api/internal/save', json={'result': 'ok'})
             dataLoaderActivityMock = m.post('http://dataloader/data-loader-api/internal/activity', json={'result': 'ok'})
 
             contentsManager = type('', (), {})()
@@ -94,19 +90,11 @@ class TestNotebookUtils():
             assert dataLoaderMock.call_count == 0
             assert dataLoaderActivityMock.call_count == 1
 
-    def test_getStorageTokenFromEnvMissing(self):
-        os.environ.pop('KBC_TOKEN')
-        with pytest.raises(Exception):
-            getStorageTokenFromEnv(logging)
-
-    def test_getStorageTokenFromEnvOk(self):
-        token = generate_random_string()
-        os.environ['KBC_TOKEN'] = token
-        assert getStorageTokenFromEnv(logging) == token
-
     def test_updateApiTimestamp(self):
         with requests_mock.Mocker() as m:
-            dataLoaderActivityMock = m.post('http://dataloader/data-loader-api/internal/activity', json={'result': 'ok'})
+            os.environ['DATA_LOADER_API_URL'] = 'dataloader'
+            url = 'http://dataloader/data-loader-api/internal/activity'
+            dataLoaderActivityMock = m.post(url, json={'result': 'ok'})
 
             updateApiTimestamp('123', logging)
 
@@ -115,9 +103,9 @@ class TestNotebookUtils():
     def test_saveFile(self):
         with requests_mock.Mocker() as m:
             os.environ['DATA_LOADER_API_URL'] = 'dataloader'
-            dataLoaderMock = m.post('http://dataloader/data-loader-api/save', json={'result': 'ok'})
+            dataLoaderMock = m.post('http://dataloader/data-loader-api/internal/save', json={'result': 'ok'})
 
-            saveFile('/file/path', '123', 'token', logging)
+            saveFile('/file/path', '123', logging)
 
             assert dataLoaderMock.call_count == 1
             response = json.loads(dataLoaderMock.last_request.text)
@@ -144,14 +132,14 @@ class TestNotebookUtils():
     def test_saveFolder(self):
         with requests_mock.Mocker() as m:
             os.environ['DATA_LOADER_API_URL'] = 'dataloader'
-            dataLoaderMock = m.post('http://dataloader/data-loader-api/save', json={'result': 'ok'})
+            dataLoaderMock = m.post('http://dataloader/data-loader-api/internal/save', json={'result': 'ok'})
 
             folder_prepare = tempfile.mkdtemp() + '/.git'
             os.mkdir(folder_prepare)
             f = open(folder_prepare + '/file.txt', 'a')
             f.write('content')
             f.close()
-            saveFolder(folder_prepare, '123', 'token', logging)
+            saveFolder(folder_prepare, '123', logging)
 
             assert dataLoaderMock.call_count == 1
             response = json.loads(dataLoaderMock.last_request.text)
