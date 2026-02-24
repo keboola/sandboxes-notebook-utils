@@ -1,5 +1,3 @@
-from datetime import datetime
-import json
 import os
 import sys
 from IPython.lib import passwd
@@ -38,14 +36,13 @@ def retrySession(
     return session
 
 
-def saveFile(file_path, sandbox_id, token, log, tags=None):
+def saveFile(file_path, sandbox_id, log, tags=None):
     """
     Construct a requests POST call with args and kwargs and process the
     results.
     Args:
         file_path: The relative path to the file from the datadir, including filename and extension
         sandbox_id: Id of the sandbox
-        token: Keboola Storage token
         log: Logger instance
         tags: Additional tags for the file
     Returns:
@@ -58,10 +55,10 @@ def saveFile(file_path, sandbox_id, token, log, tags=None):
     if tags is None:
         tags = []
     if 'DATA_LOADER_API_URL' in os.environ and os.environ['DATA_LOADER_API_URL']:
-        url = 'http://' + os.environ['DATA_LOADER_API_URL'] + '/data-loader-api/save'
+        url = 'http://' + os.environ['DATA_LOADER_API_URL'] + '/data-loader-api/internal/save'
     else:
-        url = 'http://data-loader-api/data-loader-api/save'
-    headers = {'X-StorageApi-Token': token, 'User-Agent': 'Keboola Sandbox Autosave Request'}
+        url = 'http://data-loader-api/data-loader-api/internal/save'
+    headers = {'Content-Type': 'application/json', 'User-Agent': 'Keboola Sandbox Autosave Request'}
     payload = {'file': {'source': os.path.relpath(file_path), 'tags': ['autosave', 'sandbox-' + sandbox_id] + tags}}
 
     # the timeout is set to > 3min because of the delay on 400 level exception responses
@@ -75,41 +72,28 @@ def saveFile(file_path, sandbox_id, token, log, tags=None):
         raise e
 
 
-def updateApiTimestamp(sandbox_id, token, log):
+def updateApiTimestamp(sandbox_id, log):
     """
-    Update autosave timestamp in Sandboxes API
+    Update autosave timestamp via data-loader-api
     Args:
         sandbox_id: Id of the sandbox
-        token: Keboola Storage token
         log: Logger instance
     """
 
     headers = {
         'Content-Type': 'application/json',
         'User-Agent': 'Keboola Sandbox Autosave Request',
-        'X-StorageApi-Token': token,
     }
-    url = os.environ['SANDBOXES_API_URL'] + '/sandboxes/' + sandbox_id
-    body = json.dumps({'lastAutosaveTimestamp': datetime.now().strftime('%Y-%m-%dT%H:%M:%S.%f')})
-    result = retrySession().patch(url, data=body, headers=headers)
+    if 'DATA_LOADER_API_URL' in os.environ and os.environ['DATA_LOADER_API_URL']:
+        url = 'http://' + os.environ['DATA_LOADER_API_URL'] + '/data-loader-api/internal/activity'
+    else:
+        url = 'http://data-loader-api/data-loader-api/internal/activity'
+
+    result = retrySession().post(url, headers=headers)
     if result.status_code == requests.codes.ok:
         log.info('Successfully saved autosave to Sandboxes API')
     else:
         log.error('Saving autosave to Sandboxes API errored: ' + result.text)
-
-
-def getStorageTokenFromEnv(log):
-    """
-    Find Keboola token in env vars
-    Args:
-        log: Logger instance
-    """
-
-    if 'KBC_TOKEN' in os.environ:
-        return os.environ['KBC_TOKEN']
-    else:
-        log.error('Could not find Keboola Storage API token.')
-        raise Exception('Could not find Keboola Storage API token.')
 
 
 def compressFolder(folder_path):
@@ -126,19 +110,18 @@ def compressFolder(folder_path):
     return gz_path
 
 
-def saveFolder(folder_path, sandbox_id, token, log):
+def saveFolder(folder_path, sandbox_id, log):
     """
     Gzip folder and save it to Keboola Storage
     Args:
         folder_path: Path to the folder
         sandbox_id: Id of the sandbox
-        token: Keboola Storage token
         log: Logger instance
     """
     if os.path.exists(folder_path):
         gz_path = compressFolder(folder_path)
         try:
-            saveFile(gz_path, sandbox_id, token, log, ['git'])
+            saveFile(gz_path, sandbox_id, log, ['git'])
         finally:
             if os.path.exists(gz_path):
                 os.remove(gz_path)
@@ -156,10 +139,9 @@ def scriptPostSave(model, os_path, contents_manager, **kwargs):
     log = contents_manager.log
 
     sandbox_id = os.environ['SANDBOX_ID']
-    token = getStorageTokenFromEnv(log)
-    saveFile(os_path, sandbox_id, token, log)
-    updateApiTimestamp(sandbox_id, token, log)
-    saveFolder('/data/.git', sandbox_id, token, log)
+    updateApiTimestamp(sandbox_id, log)
+    saveFile(os_path, sandbox_id, log)
+    saveFolder('/data/.git', sandbox_id, log)
 
 
 def notebookSetup(c):
